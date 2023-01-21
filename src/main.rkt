@@ -4,7 +4,7 @@
 (require json)
 (require racket/string)
 (require racket/system)
- (require data/maybe)
+(require data/maybe)
 
 ; TODO: Handle XDG_CONFIG_HOME not set
 (define (get-preset-path source)
