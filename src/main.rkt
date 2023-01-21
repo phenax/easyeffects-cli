@@ -2,6 +2,7 @@
 
 (require json)
 (require racket/string)
+ (require racket/system)
 
 ; TODO: Handle XDG_CONFIG_HOME not set
 (define (get-preset-path source)
@@ -21,9 +22,7 @@
   (let (
     [ preset-path (get-preset-path name) ]
   )
-    (println (jsexpr->string preset))
-    (display-to-file (jsexpr->string preset) preset-path
-      	#:exists 'truncate/replace)
+    (display-to-file (jsexpr->string preset) preset-path #:exists 'truncate/replace)
   ))
 
 (define (hash-path hash path)
@@ -52,14 +51,12 @@
     [ source-preset (read-source-preset "mic2") ]
     [ pitch-path (list 'input 'pitch#0 'bypass) ]
     [ pitch-value (hash-path source-preset pitch-path) ]
-
-    [ updated-preset (hash-update-path source-preset pitch-path (lambda (_) #f)) ]
-
-    [ foobar (hasheq 'foo (hasheq 'a 2)) ]
+    [ updated-preset (hash-update-path source-preset pitch-path (lambda (_) #t)) ]
   )
+
     (write-output-preset output-preset-label updated-preset)
+    (system (string-append* (list "easyeffects -l " output-preset-label)))
     (println "Aaayayy donezo")
-    ; (println (hash-path updated-preset (list 'input 'pitch#0)))
   ))
 
 ; Write to output preset json
