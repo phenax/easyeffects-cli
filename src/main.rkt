@@ -1,4 +1,4 @@
-#!/usr/bin/racket
+#!/usr/bin/env racket
 #lang racket
 
 (require json)
@@ -25,6 +25,9 @@
     preset-path
     #:exists 'truncate/replace)))
 
+(define (reload-preset preset)
+  (system (string-append "easyeffects -l " preset)))
+
 (define (hash-path hash path)
   (let* ([ reducer (lambda (k h) (hash-ref h k)) ])
   (foldl reducer hash path)))
@@ -41,25 +44,10 @@
 
 (define input-preset (make-parameter output-preset-label))
 (define effect-identifier (make-parameter nothing))
-(define update-property (make-parameter nothing))
+(define update-properties (make-parameter '()))
 
-(command-line
-  #:program "easyeffects-cli"
-  #:once-each
-  [("-i" "--input-preset") inp
-    "Input preset to use" (input-preset inp)]
-  [("-e" "--effect") eff
-    "Effect identifier" (effect-identifier (just eff))]
-  [("-s"  "--set") key value
-    "Set an effect property" (update-property (just (cons key value)))]
-  [("--enable")
-    "Enable the effect" (update-property (just (cons "bypass" #f)))]
-  [("--disable")
-    "Disable the effect" (update-property (just (cons "bypass" #t)))]
-)
-
-(define (reload-preset preset)
-  (system (string-append "easyeffects -l " preset)))
+(define (addupdate k v)
+  (update-properties (cons (cons k v) (update-properties))))
 
 (define (update-input-effect preset effect update)
   (let* (
@@ -70,17 +58,46 @@
     [ to-update-value (lambda (_) (cdr update)) ]
     [ updated-preset  (hash-update-path source-preset pitch-path to-update-value) ]
   )
-    ; (println (hash-path updated-preset (list 'input 'pitch#0)))
     (write-output-preset output-preset-label updated-preset)
     (reload-preset output-preset-label)))
 
-(define (main)
-  (match (list (input-preset) (effect-identifier) (update-property))
-    [(list preset (just effect) (just update)) #:when (not (eq? preset ""))
-      (update-input-effect preset effect update)
-      (println "Done the deed") ]
+(define (show-input-effect preset effect)
+  (let* (
+    [ source-preset   (read-source-preset preset) ]
+    [ eff-sym         (string->symbol effect) ]
+    [ pitch-path      (list 'input eff-sym) ]
+    [ effect          (jsexpr->string (hash-path source-preset pitch-path)) ]
+  )
+    (displayln effect)))
 
-    [_ (println "Nothin to do")]))
+; Parse command line args and update parameters
+(command-line
+  #:program "easyeffects-cli"
+
+  #:once-each
+  [("-i" "--input-preset") inp
+    "Input preset to use" (input-preset inp)]
+  [("-e" "--effect") eff
+    "Effect identifier" (effect-identifier (just eff))]
+  [("--enable")
+    "Enable the effect" (addupdate "bypass" #f)]
+  [("--disable")
+    "Disable the effect" (addupdate "bypass" #t)]
+
+  #:multi
+  [("-s"  "--set") key value
+    "Set an effect property" (addupdate key value)]
+)
+
+(define (main)
+  (match (list (input-preset) (effect-identifier) (update-properties))
+    [(list preset (just effect) '()) #:when (not (eq? preset ""))
+      (displayln (string-append "> JSON config for " preset "." effect "\n"))
+      (show-input-effect preset effect) ]
+    [(list preset (just effect) updates) #:when (not (eq? preset ""))
+      (map (curry update-input-effect preset effect) updates)
+      (displayln "Updated") ]
+    [_ (displayln "Nothin to do")]))
 
 (main)
 
