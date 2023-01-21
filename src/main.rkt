@@ -1,4 +1,5 @@
-; #lang racket
+#!/usr/bin/racket
+#lang racket
 
 (require json)
 (require racket/string)
